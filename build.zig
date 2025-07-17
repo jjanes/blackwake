@@ -78,6 +78,8 @@ pub fn build(b: *std.Build) void {
     exe.linkSystemLibrary("pthread");
     exe.linkSystemLibrary("dl");
     exe.linkSystemLibrary("rt");
+    exe.linkSystemLibrary("vulkan");
+    exe.linkSystemLibrary("glfw");
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -128,4 +130,3 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_lib_unit_tests.step);
     test_step.dependOn(&run_exe_unit_tests.step);
 }
-

@@ -1,28 +1,15 @@
 //! By convention, main.zig is where your main function lives in the case that
 //! you are building an executable. If you are making a library, the convention
 //! is to delete this file and start with root.zig instead.
-extern "c" fn InitWindow(width: c_int, height: c_int, title: [*:0]const u8) void;
-extern "c" fn WindowShouldClose() bool;
-extern "c" fn BeginDrawing() void;
-extern "c" fn ClearBackground(color: u32) void;
-extern "c" fn EndDrawing() void;
-extern "c" fn CloseWindow() void;
-
 const Engine = @import("engine.zig").Engine;
 
 pub fn main() !void {
-    InitWindow(800, 600, "Raylib in Zig");
-
     var engine = Engine.init();
 
-    engine.Test();
-
-    while (!WindowShouldClose()) {
-        BeginDrawing();
-        ClearBackground(0x1E1E1EFF); // RGBA
-        EndDrawing();
-    }
-    CloseWindow();
+    engine.Test() catch |err| {
+        std.debug.print("Error: {}\n", .{err});
+        return;
+    };
 }
 
 test "simple test" {

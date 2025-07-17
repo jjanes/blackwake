@@ -1,11 +1,136 @@
+const Window = @import("window.zig").Window;
+
 const std = @import("std");
+
+const c = @cImport({
+    @cInclude("raylib.h");
+});
+
+const vk = @cImport({
+    @cInclude("vulkan/vulkan.h");
+    @cDefine("GRAPHICS_API_VULKAN", "1");
+});
+
+const glfw = @cImport({
+    @cInclude("GLFW/glfw3.h");
+});
 
 pub const Engine = struct {
     pub fn init() Engine {
         return .{};
     }
 
-    pub fn Test(_: *Engine) void {
-        std.debug.print("TEST", .{});
+    pub fn Test(_: *Engine) !void {
+        var instance: vk.VkInstance = undefined;
+
+        const app_info = vk.VkApplicationInfo{
+            .sType = vk.VK_STRUCTURE_TYPE_APPLICATION_INFO,
+            .pNext = null,
+            .pApplicationName = "Zig Vulkan",
+            .applicationVersion = vk.VK_MAKE_VERSION(1, 0, 0),
+            .pEngineName = "No Engine",
+            .engineVersion = vk.VK_MAKE_VERSION(1, 0, 0),
+            .apiVersion = vk.VK_API_VERSION_1_0,
+        };
+
+        const create_info = vk.VkInstanceCreateInfo{
+            .sType = vk.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+            .pNext = null,
+            .flags = 0,
+            .pApplicationInfo = &app_info,
+            .enabledExtensionCount = 0,
+            .ppEnabledExtensionNames = null,
+            .enabledLayerCount = 0,
+            .ppEnabledLayerNames = null,
+        };
+
+        const result = vk.vkCreateInstance(&create_info, null, &instance);
+        if (result != vk.VK_SUCCESS) {
+            std.debug.print("Failed to create Vulkan instance\n", .{});
+            return;
+        }
+
+        std.debug.print("Vulkan instance created!\n", .{});
+
+        if (glfw.glfwInit() != 1) return error.GlfwInitFailed;
+
+        defer glfw.glfwTerminate();
+
+        glfw.glfwWindowHint(glfw.GLFW_CLIENT_API, glfw.GLFW_NO_API);
+        const window = glfw.glfwCreateWindow(800, 600, "Vulkan in Zig", null, null);
+        if (window == null) return error.WindowFailed;
+
+        while (glfw.glfwWindowShouldClose(window) == 0) {
+            glfw.glfwPollEvents();
+        }
+
+        glfw.glfwDestroyWindow(window);
+
+        const clear_value = vk.VkClearValue{
+            .color = .{ .float32 = .{ 1.0, 0.0, 0.0, 1.0 } },
+        };
+
+        // std.debug.print("TEST", .{});
+        //
+        // var gameWindow = Window.init();
+        //
+        // gameWindow.Create();
+        //
+        // // c.InitWindow(800, 600, "Raylib in Zig");
+        //
+        // // const texture: c.Texture2D = c.LoadTexture("assets/cards/2_of_clubs.png");
+        // const image = c.LoadImage("assets/cards/2_of_clubs.png");
+        // const pixels: [*]c.Color = @ptrCast(image.data.?);
+        //
+        // const width = @as(usize, @intCast(image.width));
+        // const height = @as(usize, @intCast(image.height));
+        // const pixel_count = width * height;
+        //
+        // for (pixels[0..pixel_count]) |*px| {
+        //     if (px.r == 255 and px.g == 255 and px.b == 255) {
+        //         px.* = c.Color{ .r = 0, .g = 0, .b = 0, .a = 0 }; // Remove white background
+        //     }
+        // }
+        //
+        // // Load shader
+        // // const shader = c.LoadShader(null, "shaders/remove_bg.fs");
+        // //
+        // // // Set uniforms
+        // // const key_loc = c.GetShaderLocation(shader, "key_color");
+        // // const thresh_loc = c.GetShaderLocation(shader, "threshold");
+        // //
+        // // var green = c.Vector3{ .x = 0.0, .y = 1.0, .z = 0.0 };
+        // // c.SetShaderValue(shader, key_loc, &green, c.SHADER_UNIFORM_VEC3);
+        // //
+        // // var threshold: f32 = 0.3;
+        // // c.SetShaderValue(shader, thresh_loc, &threshold, c.SHADER_UNIFORM_FLOAT);
+        //
+        // const texture = c.LoadTextureFromImage(image);
+        // c.UnloadImage(image);
+        //
+        // while (!c.WindowShouldClose()) {
+        //     c.BeginDrawing();
+        //     // c.ClearBackground(c.RAYWHITE);
+        //
+        //     // c.BeginShaderMode(shader);
+        //     c.DrawTexture(texture, 0, 0, c.WHITE);
+        //     // c.EndShaderMode();
+        //     //
+        //     // // Draw texture inside rectangle
+        //     // const destRect = c.Rectangle{ .x = 100, .y = 100, .width = 128, .height = 128 };
+        //     // const srcRect = c.Rectangle{ .x = 0, .y = 0, .width = @floatFromInt(texture.width), .height = @floatFromInt(texture.height) };
+        //     // const origin = c.Vector2{ .x = 0, .y = 0 };
+        //     //
+        //     // c.DrawTexturePro(texture, srcRect, destRect, origin, 0.0, c.WHITE);
+        //     //
+        //     // // c.DrawRectangle(100, 100, 200, 150, c.RED);
+        //     //
+        //     // // c.ClearBackground(0x1E1E1EFF); // RGBA
+        //     c.EndDrawing();
+        // }
+        //
+        // c.UnloadTexture(texture);
+        // // c.UnloadShader(shader);
+        // c.CloseWindow();
     }
 };
