@@ -68,7 +68,7 @@ pub fn build(b: *std.Build) void {
         .root_module = exe_mod,
     });
 
-    exe.addIncludePath(.{ .cwd_relative = "/usr/include" });
+    // exe.addIncludePath(.{ .cwd_relative = "/usr/include" });
 
     // exe.addIncludePath(.{ .path = "/usr/include/raylib.h" }); // or wherever raylib.h is
     exe.linkSystemLibrary("raylib");

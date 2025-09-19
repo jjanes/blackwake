@@ -1,0 +1,38 @@
+# Zig build artifacts
+zig-out/
+zig-cache/
+*.o
+*.a
+*.so
+*.exe
+*.pdb
+*.ilk
+main # Assuming your executable is named 'main'; adjust if different
+
+# Nix-specific files
+result/
+result-*
+.direnv/
+.envrc # Optional: Keep if you want to version control .envrc for direnv
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Dependency directories (if vendoring dependencies)
+vendor/
+deps/
+
+# Optional: Ignore user-specific configuration files

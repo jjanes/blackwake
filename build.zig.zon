@@ -71,7 +71,7 @@
         //},
         .raylib_zig = .{
             .url = "https://github.com/raysan5/raylib/archive/refs/heads/master.tar.gz",
-            .hash = "raylib-5.5.0-whq8uLGoOgS_OQP8MRTgFmkCTQAPmAD9fwi5NDW23D5y",
+            .hash = "raylib-5.6.0-dev-whq8uMw1ywQblBEHnrrJ2dLC7ifPmZJZbvCgdIak3CQs",
         },
     },
 
