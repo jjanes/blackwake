@@ -6,6 +6,15 @@ const c = @cImport({
     @cInclude("raylib.h");
 });
 
+const av = @cImport({
+    @cInclude("libavdevice/avdevice.h");
+    @cInclude("libavformat/avformat.h");
+    @cInclude("libavcodec/avcodec.h");
+    @cInclude("libswscale/swscale.h");
+    @cInclude("libavutil/imgutils.h");
+    @cInclude("libavutil/opt.h");
+});
+
 // const vk = @cImport({
 //    @cInclude("vulkan/vulkan.h");
 //    @cDefine("GRAPHICS_API_VULKAN", "1");

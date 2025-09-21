@@ -72,6 +72,13 @@ pub fn build(b: *std.Build) void {
 
     // exe.addIncludePath(.{ .path = "/usr/include/raylib.h" }); // or wherever raylib.h is
     exe.linkSystemLibrary("raylib");
+    exe.linkSystemLibrary("avformat");
+    exe.linkSystemLibrary("avcodec");
+    exe.linkSystemLibrary("swscale");
+    exe.linkSystemLibrary("swresample");
+    exe.linkSystemLibrary("avutil");
+
+    exe.linkSystemLibrary("avdevice");
     exe.linkSystemLibrary("m");
     exe.linkSystemLibrary("GL");
     exe.linkSystemLibrary("X11");
@@ -80,6 +87,7 @@ pub fn build(b: *std.Build) void {
     exe.linkSystemLibrary("rt");
     exe.linkSystemLibrary("vulkan");
     exe.linkSystemLibrary("glfw");
+    // exe.linkSystemLibrary("pkg-config");
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
