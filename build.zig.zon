@@ -35,6 +35,8 @@
     // `zig build --fetch` can be used to fetch all dependencies of a package, recursively.
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
+    // /home/john/projects/blackwake/build.zig.zon:74:21: error: hash mismatch: manifest declares raylib-5.6.0-dev-whq8uMw1ywQblBEHnrrJ2dLC7ifPmZJZbvCgdIak3CQs but the fetched package has raylib-5.6.0-dev-whq8uD82ywSfDtGC8W42DlQ7_8bYM_emB9T2pg_RByKP
+
     .dependencies = .{
         .raylib = .{
             .url = "https://github.com/raysan5/raylib/archive/refs/tags/5.0.tar.gz",
@@ -69,10 +71,6 @@
         //    // actually used.
         //    .lazy = false,
         //},
-        .raylib_zig = .{
-            .url = "https://github.com/raysan5/raylib/archive/refs/heads/master.tar.gz",
-            .hash = "raylib-5.6.0-dev-whq8uMw1ywQblBEHnrrJ2dLC7ifPmZJZbvCgdIak3CQs",
-        },
     },
 
     // Specifies the set of files and directories that are included in this package.
