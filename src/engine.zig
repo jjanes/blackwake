@@ -6,6 +6,8 @@ const c = @cImport({
     @cInclude("raylib.h");
 });
 
+const cam = @import("camera.zig");
+
 const av = @cImport({
     @cInclude("libavdevice/avdevice.h");
     @cInclude("libavformat/avformat.h");

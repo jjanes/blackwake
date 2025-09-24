@@ -43,14 +43,11 @@ pub const Camera = struct {
 
     pub fn open(self: *Camera, want_w: c.int, want_h: c.int, fps: c.int) !void {
         c.avdevice_register_all();
-
         self.width = want_w;
         self.height = want_h;
-
         const os = builtin.os.tag;
         var dev_name: [*:0]const u8 = undefined;
-        var in_fmt: *c.AVInputFormat = null;
-
+        var in_fmt: ?*c.AVInputFormat = null;
         if (os == .windows) {
             dev_name = "video=Integrated Camera";
             in_fmt = c.av_find_input_format("dshow");
@@ -63,13 +60,14 @@ pub const Camera = struct {
 
         // Build options: request size/fps; let device choose native pixel format
         var options: ?*c.AVDictionary = null;
+        defer c.av_dict_free(&options); // Clean up options dictionary
         {
             var sz: [32]u8 = undefined;
-            const len = std.fmt.bufPrint(&sz, "{d}x{d}", .{ self.width, self.height }) catch unreachable;
+            _ = std.fmt.bufPrint(&sz, "{d}x{d}", .{ self.width, self.height }) catch unreachable;
             _ = c.av_dict_set(&options, "video_size", @ptrCast(&sz[0]), 0);
 
             var fpsbuf: [16]u8 = undefined;
-            const flen = std.fmt.bufPrint(&fpsbuf, "{d}", .{fps}) catch unreachable;
+            _ = std.fmt.bufPrint(&fpsbuf, "{d}", .{fps}) catch unreachable;
             _ = c.av_dict_set(&options, "framerate", @ptrCast(&fpsbuf[0]), 0);
 
             // Hints that often help: try mjpeg first for webcams
@@ -78,7 +76,7 @@ pub const Camera = struct {
             }
         }
 
-        var fmt_ctx_local: *c.AVFormatContext = null;
+        var fmt_ctx_local: ?*c.AVFormatContext = null;
         try avErr(c.avformat_open_input(&fmt_ctx_local, dev_name, in_fmt, &options));
         self.fmt_ctx = fmt_ctx_local;
 
@@ -89,8 +87,8 @@ pub const Camera = struct {
         var video_stream_idx: c.int = -1;
         {
             var i: c.uint = 0;
-            while (i < fmt_ctx_local.nb_streams) : (i += 1) {
-                const st = fmt_ctx_local.streams[i];
+            while (i < fmt_ctx_local.?.nb_streams) : (i += 1) {
+                const st = fmt_ctx_local.?.streams[i];
                 if (st.*.codecpar.*.codec_type == c.AVMEDIA_TYPE_VIDEO) {
                     video_stream_idx = @as(c.int, @intCast(i));
                     break;
@@ -98,19 +96,18 @@ pub const Camera = struct {
             }
         }
         if (video_stream_idx < 0) fail("no video stream");
-
         self.stream_index = video_stream_idx;
 
         // Find decoder & create codec ctx
-        const codecpar = fmt_ctx_local.streams[video_stream_idx].*.codecpar;
+        const codecpar = fmt_ctx_local.?.streams[@intCast(video_stream_idx)].*.codecpar;
         const dec = c.avcodec_find_decoder(codecpar.*.codec_id);
         if (dec == null) fail("decoder not found");
 
         const codec_ctx_local = c.avcodec_alloc_context3(dec) orelse fail("alloc codec ctx");
         try avErr(c.avcodec_parameters_to_context(codec_ctx_local, codecpar));
+
         // Set desired thread count lightly
         codec_ctx_local.thread_count = 2;
-
         try avErr(c.avcodec_open2(codec_ctx_local, dec, null));
         self.codec_ctx = codec_ctx_local;
 
@@ -123,6 +120,7 @@ pub const Camera = struct {
         var rgba_linesize: [4]c.int = .{ 0, 0, 0, 0 };
         const num_bytes = c.av_image_get_buffer_size(c.AV_PIX_FMT_RGBA, self.width, self.height, 1);
         if (num_bytes <= 0) fail("av_image_get_buffer_size");
+
         const buf = std.heap.c_allocator.alloc(u8, @intCast(num_bytes)) catch fail("alloc rgba buf");
         self.rgba_buf = buf;
 
@@ -142,13 +140,12 @@ pub const Camera = struct {
         self.frame_rgba.?.*.data = rgba_data;
         self.frame_rgba.?.*.linesize = rgba_linesize;
 
-        // Create SWS context (source fmt known only after first decode; we’ll init lazily)
+        // Create SWS context (source fmt known only after first decode; we'll init lazily)
         self.sws = null;
 
         // Packet
         self.pkt = c.av_packet_alloc() orelse fail("av_packet_alloc");
     }
-
     fn ensureSws(self: *Camera, src_w: c.int, src_h: c.int, src_fmt: c.AVPixelFormat) !void {
         if (self.sws == null) {
             const sws = c.sws_getContext(
