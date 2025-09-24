@@ -6,7 +6,7 @@ const c = @cImport({
     @cInclude("raylib.h");
 });
 
-const cam = @import("camera.zig");
+const Camera = @import("camera.zig").Camera;
 
 const av = @cImport({
     @cInclude("libavdevice/avdevice.h");
@@ -32,6 +32,19 @@ pub const Engine = struct {
     }
 
     pub fn Test(_: *Engine) !void {
+        var camera = Camera.init();
+        defer camera.deinit();
+
+        const cam_width = 640;
+        const cam_height = 480;
+        const fps = 30;
+
+        // Try to open the camera
+        camera.open(cam_width, cam_height, fps) catch |err| {
+            std.debug.print("Failed to open camera: {}\n", .{err});
+            return;
+        };
+
         // var instance: vk.VkInstance = undefined;
         //
         // const app_info = vk.VkApplicationInfo{

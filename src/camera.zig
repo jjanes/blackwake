@@ -3,7 +3,6 @@ const builtin = @import("builtin");
 
 const c = @cImport({
     @cInclude("raylib.h");
-
     @cInclude("libavformat/avformat.h");
     @cInclude("libavdevice/avdevice.h");
     @cInclude("libavcodec/avcodec.h");
@@ -16,7 +15,7 @@ fn fail(msg: []const u8) noreturn {
     @panic("fatal");
 }
 
-fn avErr(ret: c.int) !void {
+fn avErr(ret: c_int) !void {
     if (ret < 0) {
         var buf: [256]u8 = undefined;
         _ = c.av_strerror(ret, &buf, buf.len);
@@ -33,21 +32,21 @@ pub const Camera = struct {
     frame_rgba: ?*c.AVFrame = null,
     pkt: ?*c.AVPacket = null,
     rgba_buf: ?[]u8 = null,
-    stream_index: c.int = -1,
-    width: c.int = 640,
-    height: c.int = 480,
+    stream_index: c_int = -1,
+    width: c_int = 640,
+    height: c_int = 480,
 
     pub fn init() Camera {
         return .{};
     }
 
-    pub fn open(self: *Camera, want_w: c.int, want_h: c.int, fps: c.int) !void {
+    pub fn open(self: *Camera, want_w: c_int, want_h: c_int, fps: c_int) !void {
         c.avdevice_register_all();
         self.width = want_w;
         self.height = want_h;
         const os = builtin.os.tag;
         var dev_name: [*:0]const u8 = undefined;
-        var in_fmt: ?*c.AVInputFormat = null;
+        var in_fmt: [*c]const c.AVInputFormat = null;
         if (os == .windows) {
             dev_name = "video=Integrated Camera";
             in_fmt = c.av_find_input_format("dshow");
@@ -62,35 +61,46 @@ pub const Camera = struct {
         var options: ?*c.AVDictionary = null;
         defer c.av_dict_free(&options); // Clean up options dictionary
         {
-            var sz: [32]u8 = undefined;
-            _ = std.fmt.bufPrint(&sz, "{d}x{d}", .{ self.width, self.height }) catch unreachable;
-            _ = c.av_dict_set(&options, "video_size", @ptrCast(&sz[0]), 0);
+            if (os == .windows) {
+                var sz: [32]u8 = undefined;
+                _ = std.fmt.bufPrint(&sz, "{d}x{d}", .{ self.width, self.height }) catch unreachable;
+                _ = c.av_dict_set(&options, "video_size", @ptrCast(&sz[0]), 0);
 
-            var fpsbuf: [16]u8 = undefined;
-            _ = std.fmt.bufPrint(&fpsbuf, "{d}", .{fps}) catch unreachable;
-            _ = c.av_dict_set(&options, "framerate", @ptrCast(&fpsbuf[0]), 0);
+                var fpsbuf: [16]u8 = undefined;
+                _ = std.fmt.bufPrint(&fpsbuf, "{d}", .{fps}) catch unreachable;
+                _ = c.av_dict_set(&options, "framerate", @ptrCast(&fpsbuf[0]), 0);
+            } else {
+                // For V4L2, try different option names or let the device choose
+                var sz: [32]u8 = undefined;
+                _ = std.fmt.bufPrint(&sz, "{d}x{d}", .{ self.width, self.height }) catch unreachable;
 
-            // Hints that often help: try mjpeg first for webcams
-            if (os != .windows) {
+                // Try both possible option names
+                _ = c.av_dict_set(&options, "s", @ptrCast(&sz[0]), 0);
+
+                var fpsbuf: [16]u8 = undefined;
+                _ = std.fmt.bufPrint(&fpsbuf, "{d}", .{fps}) catch unreachable;
+                _ = c.av_dict_set(&options, "r", @ptrCast(&fpsbuf[0]), 0);
+
+                // Hints that often help: try mjpeg first for webcams
                 _ = c.av_dict_set(&options, "input_format", "mjpeg", 0);
             }
         }
 
         var fmt_ctx_local: ?*c.AVFormatContext = null;
-        try avErr(c.avformat_open_input(&fmt_ctx_local, dev_name, in_fmt, &options));
+        try avErr(c.avformat_open_input(@ptrCast(&fmt_ctx_local), dev_name, in_fmt, &options));
         self.fmt_ctx = fmt_ctx_local;
 
         // Find stream info (optional, but helps some devices)
         _ = c.avformat_find_stream_info(fmt_ctx_local, null);
 
         // Find best video stream
-        var video_stream_idx: c.int = -1;
+        var video_stream_idx: c_int = -1;
         {
-            var i: c.uint = 0;
+            var i: c_uint = 0;
             while (i < fmt_ctx_local.?.nb_streams) : (i += 1) {
                 const st = fmt_ctx_local.?.streams[i];
                 if (st.*.codecpar.*.codec_type == c.AVMEDIA_TYPE_VIDEO) {
-                    video_stream_idx = @as(c.int, @intCast(i));
+                    video_stream_idx = @as(c_int, @intCast(i));
                     break;
                 }
             }
@@ -107,7 +117,7 @@ pub const Camera = struct {
         try avErr(c.avcodec_parameters_to_context(codec_ctx_local, codecpar));
 
         // Set desired thread count lightly
-        codec_ctx_local.thread_count = 2;
+        codec_ctx_local.*.thread_count = 2;
         try avErr(c.avcodec_open2(codec_ctx_local, dec, null));
         self.codec_ctx = codec_ctx_local;
 
@@ -116,8 +126,8 @@ pub const Camera = struct {
         self.frame_rgba = c.av_frame_alloc() orelse fail("av_frame_alloc rgba");
 
         // Set up RGBA target frame buffer
-        var rgba_data: [4][*]u8 = .{ null, null, null, null };
-        var rgba_linesize: [4]c.int = .{ 0, 0, 0, 0 };
+        var rgba_data: [8][*c]u8 = undefined;
+        var rgba_linesize: [8]c_int = .{ 0, 0, 0, 0, 0, 0, 0, 0 };
         const num_bytes = c.av_image_get_buffer_size(c.AV_PIX_FMT_RGBA, self.width, self.height, 1);
         if (num_bytes <= 0) fail("av_image_get_buffer_size");
 
@@ -125,8 +135,8 @@ pub const Camera = struct {
         self.rgba_buf = buf;
 
         try avErr(c.av_image_fill_arrays(
-            &rgba_data,
-            &rgba_linesize,
+            @ptrCast(&rgba_data),
+            @ptrCast(&rgba_linesize),
             buf.ptr,
             c.AV_PIX_FMT_RGBA,
             self.width,
@@ -146,7 +156,8 @@ pub const Camera = struct {
         // Packet
         self.pkt = c.av_packet_alloc() orelse fail("av_packet_alloc");
     }
-    fn ensureSws(self: *Camera, src_w: c.int, src_h: c.int, src_fmt: c.AVPixelFormat) !void {
+
+    fn ensureSws(self: *Camera, src_w: c_int, src_h: c_int, src_fmt: c.AVPixelFormat) !void {
         if (self.sws == null) {
             const sws = c.sws_getContext(
                 src_w,
@@ -216,15 +227,29 @@ pub const Camera = struct {
     }
 
     pub fn deinit(self: *Camera) void {
-        if (self.pkt) |p| c.av_packet_free(&p);
-        if (self.frame_rgba) |fr| c.av_frame_free(&fr);
-        if (self.frame) |fr| c.av_frame_free(&fr);
-        if (self.codec_ctx) |cc| c.avcodec_free_context(&cc);
+        if (self.pkt) |p| {
+            var pkt_ptr: [*c]c.AVPacket = @ptrCast(p);
+            c.av_packet_free(@ptrCast(&pkt_ptr));
+        }
+        if (self.frame_rgba) |fr| {
+            var frame_ptr: [*c]c.AVFrame = @ptrCast(fr);
+            c.av_frame_free(@ptrCast(&frame_ptr));
+        }
+        if (self.frame) |fr| {
+            var frame_ptr: [*c]c.AVFrame = @ptrCast(fr);
+            c.av_frame_free(@ptrCast(&frame_ptr));
+        }
+        if (self.codec_ctx) |cc| {
+            var ctx_ptr: [*c]c.AVCodecContext = @ptrCast(cc);
+            c.avcodec_free_context(@ptrCast(&ctx_ptr));
+        }
         if (self.fmt_ctx) |fc| {
-            c.avformat_close_input(&fc);
+            var fmt_ptr: [*c]c.AVFormatContext = @ptrCast(fc);
+            c.avformat_close_input(@ptrCast(&fmt_ptr));
         }
         if (self.sws) |s| c.sws_freeContext(s);
         if (self.rgba_buf) |b| std.heap.c_allocator.free(b);
         self.* = .{};
     }
 };
+
