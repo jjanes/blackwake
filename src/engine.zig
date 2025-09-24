@@ -132,12 +132,31 @@ pub const Engine = struct {
         const texture = c.LoadTextureFromImage(image);
         c.UnloadImage(image);
 
+        var text_camera: c.Texture2D = undefined;
+        var has_texture = false;
+
         while (!c.WindowShouldClose()) {
             c.BeginDrawing();
+
+            if (camera.grab() catch false) {
+                const pixs = camera.rgbaSlice();
+                if (pixs.len > 0) {
+                    if (!has_texture) {
+                        const img = c.Image{ .data = pixs.ptr, .width = 640, .height = 480, .mipmaps = 1, .format = c.PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+                        text_camera = c.LoadTextureFromImage(img);
+                        has_texture = true;
+                    } else {
+                        // CORE: Update GPU texture with new RAM data
+                        c.UpdateTexture(text_camera, pixs.ptr);
+                    }
+                }
+            }
+
             // c.ClearBackground(c.RAYWHITE);
 
             // c.BeginShaderMode(shader);
             c.DrawTexture(texture, 0, 0, c.WHITE);
+            c.DrawTexture(text_camera, 0, 0, c.WHITE);
             // c.EndShaderMode();
             //
             // // Draw texture inside rectangle
