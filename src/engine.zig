@@ -1,14 +1,7 @@
-const Window = @import("window.zig").Window;
-
 const std = @import("std");
 
 const c = @cImport({
     @cInclude("raylib.h");
-});
-
-const Camera = @import("camera.zig").Camera;
-
-const av = @cImport({
     @cInclude("libavdevice/avdevice.h");
     @cInclude("libavformat/avformat.h");
     @cInclude("libavcodec/avcodec.h");
@@ -16,6 +9,10 @@ const av = @cImport({
     @cInclude("libavutil/imgutils.h");
     @cInclude("libavutil/opt.h");
 });
+
+const Window = @import("window.zig").Window;
+const Camera = @import("camera.zig").Camera(c);
+const Desktop = @import("desktop.zig").Desktop(c);
 
 // const vk = @cImport({
 //    @cInclude("vulkan/vulkan.h");
@@ -32,15 +29,33 @@ pub const Engine = struct {
     }
 
     pub fn Test(_: *Engine) !void {
-        var camera = Camera.init();
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        defer _ = gpa.deinit();
+        const alloc = gpa.allocator();
+
+        var camera = Camera.init(alloc);
+        var desktop = Desktop.init(alloc);
+
         defer camera.deinit();
+        defer desktop.deinit();
 
         const cam_width = 640;
         const cam_height = 480;
+
+        const desktop_width = 1920;
+        const desktop_height = 1080;
+
         const fps = 30;
 
         // Try to open the camera
-        camera.open(cam_width, cam_height, fps) catch |err| {
+        std.debug.print("init camera", .{});
+        camera.open(cam_width, cam_height, fps, "HD Pro Webcam C920") catch |err| {
+            std.debug.print("Failed to open camera: {}\n", .{err});
+            return;
+        };
+
+        std.debug.print("init desktop", .{});
+        desktop.open(desktop_width, desktop_height, fps) catch |err| {
             std.debug.print("Failed to open camera: {}\n", .{err});
             return;
         };
@@ -134,44 +149,131 @@ pub const Engine = struct {
 
         var text_camera: c.Texture2D = undefined;
         var has_texture = false;
+        // Create initial texture from desktop buffer view
+        const desktop_img = desktop.imageView();
+        const desktop_tex = c.LoadTextureFromImage(desktop_img);
+        var have_desktop_tex = true;
 
         while (!c.WindowShouldClose()) {
-            c.BeginDrawing();
+            // 1) Pull a new desktop frame
+            if (have_desktop_tex) {
+                const dpix = desktop.nextFrame() catch |e| switch (e) {
+                    error.EndOfStream => {
+                        have_desktop_tex = false;
+                        break;
+                    },
+                    error.NotOpen => {
+                        have_desktop_tex = false;
+                        break;
+                    },
+                    else => dpix: {
+                        // on transient ffmpeg errors, skip this frame
+                        break :dpix null;
+                    },
+                };
 
+                if (dpix) |frame_pixels| {
+                    // Update desktop texture with latest RGBA buffer
+                    c.UpdateTexture(desktop_tex, frame_pixels.ptr);
+                }
+            }
+
+            // 2) Pull a new camera frame
             if (camera.grab() catch false) {
                 const pixs = camera.rgbaSlice();
                 if (pixs.len > 0) {
                     if (!has_texture) {
-                        const img = c.Image{ .data = pixs.ptr, .width = 640, .height = 480, .mipmaps = 1, .format = c.PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+                        const img = c.Image{
+                            .data = pixs.ptr,
+                            .width = 640,
+                            .height = 480,
+                            .mipmaps = 1,
+                            .format = c.PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+                        };
                         text_camera = c.LoadTextureFromImage(img);
                         has_texture = true;
                     } else {
-                        // CORE: Update GPU texture with new RAM data
                         c.UpdateTexture(text_camera, pixs.ptr);
                     }
                 }
             }
 
-            // c.ClearBackground(c.RAYWHITE);
+            // 3) Draw: desktop FIRST (background), camera SECOND (on top)
+            c.BeginDrawing();
+            c.ClearBackground(c.BLACK);
 
-            // c.BeginShaderMode(shader);
-            c.DrawTexture(texture, 0, 0, c.WHITE);
-            c.DrawTexture(text_camera, 0, 0, c.WHITE);
-            // c.EndShaderMode();
-            //
-            // // Draw texture inside rectangle
-            // const destRect = c.Rectangle{ .x = 100, .y = 100, .width = 128, .height = 128 };
-            // const srcRect = c.Rectangle{ .x = 0, .y = 0, .width = @floatFromInt(texture.width), .height = @floatFromInt(texture.height) };
-            // const origin = c.Vector2{ .x = 0, .y = 0 };
-            //
-            // c.DrawTexturePro(texture, srcRect, destRect, origin, 0.0, c.WHITE);
-            //
-            // // c.DrawRectangle(100, 100, 200, 150, c.RED);
-            //
-            // // c.ClearBackground(0x1E1E1EFF); // RGBA
+            if (have_desktop_tex) {
+                c.DrawTexture(desktop_tex, 0, 0, c.WHITE);
+            }
+
+            if (has_texture) {
+                const win_w = c.GetScreenWidth();
+                const win_h = c.GetScreenHeight();
+
+                const cam_w: f32 = 320;
+                const cam_h: f32 = 240;
+                const margin: f32 = 16;
+
+                const x = @as(f32, @floatFromInt(win_w)) - cam_w - margin;
+                const y = @as(f32, @floatFromInt(win_h)) - cam_h - margin;
+
+                const src = c.Rectangle{
+                    .x = 0,
+                    .y = 0,
+                    .width = @as(f32, @floatFromInt(text_camera.width)),
+                    .height = @as(f32, @floatFromInt(text_camera.height)),
+                };
+                const dst = c.Rectangle{
+                    .x = x,
+                    .y = y,
+                    .width = cam_w,
+                    .height = cam_h,
+                };
+                const origin = c.Vector2{ .x = 0, .y = 0 };
+
+                c.DrawTexturePro(text_camera, src, dst, origin, 0.0, c.WHITE);
+            }
+
             c.EndDrawing();
         }
 
+        // while (!c.WindowShouldClose()) {
+        //     c.BeginDrawing();
+        //
+        //     if (camera.grab() catch false) {
+        //         const pixs = camera.rgbaSlice();
+        //         if (pixs.len > 0) {
+        //             if (!has_texture) {
+        //                 const img = c.Image{ .data = pixs.ptr, .width = 640, .height = 480, .mipmaps = 1, .format = c.PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+        //                 text_camera = c.LoadTextureFromImage(img);
+        //                 has_texture = true;
+        //             } else {
+        //                 // CORE: Update GPU texture with new RAM data
+        //                 c.UpdateTexture(text_camera, pixs.ptr);
+        //             }
+        //         }
+        //     }
+        //
+        //     // c.ClearBackground(c.RAYWHITE);
+        //
+        //     // c.BeginShaderMode(shader);
+        //     c.DrawTexture(texture, 0, 0, c.WHITE);
+        //     c.DrawTexture(text_camera, 0, 0, c.WHITE);
+        //     // c.EndShaderMode();
+        //     //
+        //     // // Draw texture inside rectangle
+        //     // const destRect = c.Rectangle{ .x = 100, .y = 100, .width = 128, .height = 128 };
+        //     // const srcRect = c.Rectangle{ .x = 0, .y = 0, .width = @floatFromInt(texture.width), .height = @floatFromInt(texture.height) };
+        //     // const origin = c.Vector2{ .x = 0, .y = 0 };
+        //     //
+        //     // c.DrawTexturePro(texture, srcRect, destRect, origin, 0.0, c.WHITE);
+        //     //
+        //     // // c.DrawRectangle(100, 100, 200, 150, c.RED);
+        //     //
+        //     // // c.ClearBackground(0x1E1E1EFF); // RGBA
+        //     c.EndDrawing();
+        // }
+        //
         c.UnloadTexture(texture);
         // c.UnloadShader(shader);
         c.CloseWindow();

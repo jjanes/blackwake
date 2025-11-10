@@ -8,6 +8,6 @@ pub const Window = struct {
     }
 
     pub fn Create(_: *Window) void {
-        c.InitWindow(1200, 1000, "Raylib in Zig");
+        c.InitWindow(1920, 1080, "Raylib in Zig");
     }
 };
