@@ -8,7 +8,15 @@ pub fn build(b: *std.Build) void {
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
     // for restricting supported target set are available.
-    const target = b.standardTargetOptions(.{});
+
+    const target = b.standardTargetOptions(.{
+        // Make sure this matches how you built FFmpeg:
+        .default_target = .{
+            .cpu_arch = .x86_64,
+            .os_tag = .windows,
+            .abi = .gnu, // <- important: windows-gnu (MinGW)
+        },
+    });
 
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
@@ -68,26 +76,96 @@ pub fn build(b: *std.Build) void {
         .root_module = exe_mod,
     });
 
+    // Use C standard library (needed for stdio.h, etc)
+    exe.linkLibC();
+
     // exe.addIncludePath(.{ .cwd_relative = "/usr/include" });
-
-    // exe.addIncludePath(.{ .path = "/usr/include/raylib.h" }); // or wherever raylib.h is
-    exe.linkSystemLibrary("raylib");
-    exe.linkSystemLibrary("avformat");
-    exe.linkSystemLibrary("avcodec");
-    exe.linkSystemLibrary("swscale");
-    exe.linkSystemLibrary("swresample");
-    exe.linkSystemLibrary("avutil");
-
-    exe.linkSystemLibrary("avdevice");
-    exe.linkSystemLibrary("m");
-    exe.linkSystemLibrary("GL");
-    exe.linkSystemLibrary("X11");
-    exe.linkSystemLibrary("pthread");
-    exe.linkSystemLibrary("dl");
-    exe.linkSystemLibrary("rt");
-    exe.linkSystemLibrary("vulkan");
-    exe.linkSystemLibrary("glfw");
+    //
+    // // exe.addIncludePath(.{ .path = "/usr/include/raylib.h" }); // or wherever raylib.h is
+    // exe.linkSystemLibrary("raylib");
+    // exe.linkSystemLibrary("avformat");
+    // exe.linkSystemLibrary("avcodec");
+    // exe.linkSystemLibrary("swscale");
+    // exe.linkSystemLibrary("swresample");
+    // exe.linkSystemLibrary("avutil");
+    //
+    // exe.linkSystemLibrary("avdevice");
+    // exe.linkSystemLibrary("m");
+    // exe.linkSystemLibrary("GL");
+    // exe.linkSystemLibrary("X11");
+    // exe.linkSystemLibrary("pthread");
+    // exe.linkSystemLibrary("dl");
+    // exe.linkSystemLibrary("rt");
+    // exe.linkSystemLibrary("vulkan");
+    // exe.linkSystemLibrary("glfw");
     // exe.linkSystemLibrary("pkg-config");
+    //
+    //
+    const os = target.result.os.tag;
+
+    if (os == .linux) {
+        // Your current list (Linux desktop)
+        exe.linkSystemLibrary("raylib");
+        exe.linkSystemLibrary("avformat");
+        exe.linkSystemLibrary("avcodec");
+        exe.linkSystemLibrary("swscale");
+        exe.linkSystemLibrary("swresample");
+        exe.linkSystemLibrary("avutil");
+        exe.linkSystemLibrary("avdevice");
+        exe.linkSystemLibrary("m");
+        exe.linkSystemLibrary("GL");
+        exe.linkSystemLibrary("X11");
+        exe.linkSystemLibrary("pthread");
+        exe.linkSystemLibrary("dl");
+        exe.linkSystemLibrary("rt");
+        exe.linkSystemLibrary("vulkan");
+        exe.linkSystemLibrary("glfw");
+    } else if (os == .windows) {
+        // Point these at your prebuilt .lib/.dll locations
+        // exe.addIncludePath(.{ .path = "deps/win/include" });
+        // exe.addLibraryPath(.{ .path = "deps/win/lib" });
+
+        exe.addIncludePath(.{ .cwd_relative = "deps/ffmpeg/include" });
+        exe.addLibraryPath(.{ .cwd_relative = "deps/ffmpeg/bin" });
+
+        // exe.addIncludePath(.{ .cwd_relative = "deps/raylib/include" });
+        // exe.addLibraryPath(.{ .cwd_relative = "deps/raylib/lib" });
+
+        exe.addIncludePath(b.path("deps/raylib/include"));
+        exe.addLibraryPath(b.path("deps/raylib/lib"));
+
+        //
+        // exe.addIncludePath("deps/ffmpeg/include");
+
+        //
+
+        // core libs
+        exe.linkSystemLibrary("raylib");
+        exe.linkSystemLibrary("avformat");
+        exe.linkSystemLibrary("avcodec");
+        exe.linkSystemLibrary("swscale");
+        exe.linkSystemLibrary("swresample");
+        exe.linkSystemLibrary("avutil");
+        exe.linkSystemLibrary("avdevice");
+
+        // Windows equivalents / platform libs
+        exe.linkSystemLibrary("opengl32");
+        exe.linkSystemLibrary("gdi32");
+        exe.linkSystemLibrary("winmm");
+        exe.linkSystemLibrary("user32");
+        exe.linkSystemLibrary("shell32");
+        exe.linkSystemLibrary("kernel32");
+
+        // Networking/crypto helpers often needed by FFmpeg builds
+        exe.linkSystemLibrary("ws2_32");
+        exe.linkSystemLibrary("bcrypt");
+
+        // If you use GLFW directly:
+        // exe.linkSystemLibrary("glfw3");
+
+        // If you use Vulkan:
+        // exe.linkSystemLibrary("vulkan-1");
+    }
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default

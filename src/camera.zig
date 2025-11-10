@@ -48,7 +48,7 @@ pub const Camera = struct {
         var dev_name: [*:0]const u8 = undefined;
         var in_fmt: [*c]const c.AVInputFormat = null;
         if (os == .windows) {
-            dev_name = "video=Integrated Camera";
+            dev_name = "video=HD Pro Webcam C920";
             in_fmt = c.av_find_input_format("dshow");
             if (in_fmt == null) fail("av_find_input_format(dshow) failed");
         } else {
@@ -63,11 +63,11 @@ pub const Camera = struct {
         {
             if (os == .windows) {
                 var sz: [32]u8 = undefined;
-                _ = std.fmt.bufPrint(&sz, "{d}x{d}", .{ self.width, self.height }) catch unreachable;
+                _ = std.fmt.bufPrintZ(&sz, "{d}x{d}", .{ self.width, self.height }) catch unreachable;
                 _ = c.av_dict_set(&options, "video_size", @ptrCast(&sz[0]), 0);
 
                 var fpsbuf: [16]u8 = undefined;
-                _ = std.fmt.bufPrint(&fpsbuf, "{d}", .{fps}) catch unreachable;
+                _ = std.fmt.bufPrintZ(&fpsbuf, "{d}", .{fps}) catch unreachable;
                 _ = c.av_dict_set(&options, "framerate", @ptrCast(&fpsbuf[0]), 0);
             } else {
                 // For V4L2, try different option names or let the device choose
@@ -252,4 +252,3 @@ pub const Camera = struct {
         self.* = .{};
     }
 };
-

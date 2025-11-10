@@ -1,0 +1,14 @@
+prefix=/home/john/ffmpeg-win64
+exec_prefix=${prefix}
+libdir=/home/john/ffmpeg-win64/lib
+includedir=/home/john/ffmpeg-win64/include
+
+Name: libswscale
+Description: FFmpeg image rescaling library
+Version: 9.1.100
+Requires: 
+Requires.private: libavutil >= 60.8.100
+Conflicts:
+Libs: -L${libdir}  -lswscale 
+Libs.private: -lm -latomic
+Cflags: -I${includedir}

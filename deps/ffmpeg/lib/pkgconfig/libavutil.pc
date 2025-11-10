@@ -1,0 +1,14 @@
+prefix=/home/john/ffmpeg-win64
+exec_prefix=${prefix}
+libdir=/home/john/ffmpeg-win64/lib
+includedir=/home/john/ffmpeg-win64/include
+
+Name: libavutil
+Description: FFmpeg utility library
+Version: 60.8.100
+Requires: 
+Requires.private: 
+Conflicts:
+Libs: -L${libdir}  -lavutil 
+Libs.private: -lm -luser32 -lbcrypt -latomic
+Cflags: -I${includedir}

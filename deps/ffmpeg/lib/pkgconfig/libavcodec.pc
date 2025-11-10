@@ -1,0 +1,14 @@
+prefix=/home/john/ffmpeg-win64
+exec_prefix=${prefix}
+libdir=/home/john/ffmpeg-win64/lib
+includedir=/home/john/ffmpeg-win64/include
+
+Name: libavcodec
+Description: FFmpeg codec library
+Version: 62.11.100
+Requires: 
+Requires.private: libswresample >= 6.1.100, libavutil >= 60.8.100
+Conflicts:
+Libs: -L${libdir}  -lavcodec 
+Libs.private: -liconv -lm -latomic -llzma -lmfuuid -lole32 -lstrmiids -lole32 -luser32 -lz
+Cflags: -I${includedir}

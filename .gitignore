@@ -34,6 +34,6 @@ Thumbs.db
 
 # Dependency directories (if vendoring dependencies)
 vendor/
-deps/
+# deps/
 
 # Optional: Ignore user-specific configuration files
